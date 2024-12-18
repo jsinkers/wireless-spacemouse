@@ -1,25 +1,7 @@
 /*
- * This example turns the ESP32 into a Bluetooth LE gamepad that presses buttons and moves axis
+ * Reads a potentiometer on pin 34 and maps the reading to the X axis
  *
- * At the moment we are using the default settings, but they can be canged using a BleGamepadConfig instance as parameter for the begin function.
- *
- * Possible buttons are:
- * BUTTON_1 through to BUTTON_16
- * (16 buttons by default. Library can be configured to use up to 128)
- *
- * Possible DPAD/HAT switch position values are:
- * DPAD_CENTERED, DPAD_UP, DPAD_UP_RIGHT, DPAD_RIGHT, DPAD_DOWN_RIGHT, DPAD_DOWN, DPAD_DOWN_LEFT, DPAD_LEFT, DPAD_UP_LEFT
- * (or HAT_CENTERED, HAT_UP etc)
- *
- * bleGamepad.setAxes sets all axes at once. There are a few:
- * (x axis, y axis, z axis, rx axis, ry axis, rz axis, slider 1, slider 2)
- *
- * Library can also be configured to support up to 5 simulation controls
- * (rudder, throttle, accelerator, brake, steering), but they are not enabled by default.
- *
- * Library can also be configured to support different function buttons
- * (start, select, menu, home, back, volume increase, volume decrease, volume mute)
- * start and select are enabled by default
+ * Potentiometers can be noisy, so the sketch can take multiple samples to average out the readings
  */
 
 #include <Arduino.h>
@@ -27,35 +9,66 @@
 
 BleGamepad bleGamepad;
 
+const int potPin = 0;                // Potentiometer is connected to GPIO 0 // old : 34 (Analog ADC1_CH6)
+const int numberOfPotSamples = 5;     // Number of pot samples to take (to smooth the values)
+const int delayBetweenSamples = 4;    // Delay in milliseconds between pot samples
+const int delayBetweenHIDReports = 5; // Additional delay in milliseconds between HID reports
+
+
 void setup()
 {
     Serial.begin(115200);
     Serial.println("Starting BLE work!");
     bleGamepad.begin();
-    // The default bleGamepad.begin() above enables 16 buttons, all axes, one hat, and no simulation controls or special buttons
 }
 
 void loop()
 {
     if (bleGamepad.isConnected())
     {
-        Serial.println("Press buttons 5, 16 and start. Move all enabled axes to max. Set DPAD (hat 1) to down right.");
-        bleGamepad.press(BUTTON_5);
-        bleGamepad.press(BUTTON_16);
-        bleGamepad.pressStart();
-        bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
-        bleGamepad.setHat1(HAT_DOWN_RIGHT);
-        // All axes, sliders, hats etc can also be set independently. See the IndividualAxes.ino example
-        delay(500);
+        int potValues[numberOfPotSamples]; // Array to store pot readings
+        int potValue = 0;                  // Variable to store calculated pot reading average
 
-        Serial.println("Release button 5 and start. Move all axes to min. Set DPAD (hat 1) to centred.");
-        bleGamepad.release(BUTTON_5);
-        bleGamepad.releaseStart();
-        bleGamepad.setHat1(HAT_CENTERED);
-        bleGamepad.setAxes(0, 0, 0, 0, 0, 0, 0, 0);
-        delay(500);
-    } else {
-        Serial.println("Not connected");
-        delay(1000);
+        // Populate readings
+        for (int i = 0; i < numberOfPotSamples; i++)
+        {
+            potValues[i] = analogRead(potPin);
+            potValue += potValues[i];
+            delay(delayBetweenSamples);
+        }
+
+        // Calculate the average
+        potValue = potValue / numberOfPotSamples;
+
+        // Map analog reading from 0 ~ 4095 to 32737 ~ 0 for use as an axis reading
+        int adjustedValue = map(potValue, 0, 4095, 32737, 0);
+
+        // Update X axis and auto-send report
+        bleGamepad.setX(adjustedValue);
+        delay(delayBetweenHIDReports);
+
+        // The code below (apart from the 2 closing braces) is for pot value degugging, and can be removed
+        // Print readings to serial port
+        Serial.print("Sent: ");
+        Serial.print(adjustedValue);
+        Serial.print("\tRaw Avg: ");
+        Serial.print(potValue);
+        Serial.print("\tRaw: {");
+
+        // Iterate through raw pot values, printing them to the serial port
+        for (int i = 0; i < numberOfPotSamples; i++)
+        {
+            Serial.print(potValues[i]);
+
+            // Format the values into a comma seperated list
+            if (i == numberOfPotSamples - 1)
+            {
+                Serial.println("}");
+            }
+            else
+            {
+                Serial.print(", ");
+            }
+        }
     }
 }
