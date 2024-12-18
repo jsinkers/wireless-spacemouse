@@ -172,44 +172,39 @@ void loop() {
     Serial.println(centered[3]);
   }
 
-  // Integer has been changed to 16 bit int16_t to match what the HID protocol
-  // expects.
   // TODO: refactor as a vector
-  int16_t transX, transY, transZ, rotX, rotY,
-      rotZ;  // Declare movement variables at 16 bit integers
+  // Declare movement variables at 16 bit int16_t to match HID protocol expectation
+  int16_t transX, transY, transZ, rotX, rotY, rotZ;  
 
-  // Final divisor can be changed to alter sensitivity for each axis.
+  // compute translations
   transX = -centered[AY] / TX_SENSITIVITY;
   transY = -centered[BY] / TY_SENSITIVITY;
   if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE)) {
-    transZ = (-centered[AX] - centered[BX]) /
-             TZ_SENSITIVITY;
+    transZ = (-centered[AX] - centered[BX]) / TZ_SENSITIVITY;
     transX = 0;
     transY = 0;
   } else {
     transZ = 0;
   }
   
-  // don't couple translation and rotation
-  if (!(transX || transY || transZ)) {
-    rotX = (-centered[AX]) / RX_SENSITIVITY;
-    rotY = (+centered[BX]) / RY_SENSITIVITY;
-    if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE)) {
-      rotZ = (+centered[AY] + centered[BY]) /
-            RZ_SENSITIVITY;
-      rotX = 0;
-      rotY = 0;
-    } else {
-      rotZ = 0;
-    }
+  // compute rotations
+  rotZ = 0;
+  rotX = (-centered[AX]) / RX_SENSITIVITY;
+  rotY = (+centered[BX]) / RY_SENSITIVITY;
 
-    // don't couple translation and rotation
-    if (rotX || rotY || rotZ) {
+  // check for Z axis rotation - necessary to differentiate from coupled +X-Y translation
+  if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE)) {
+    int diff = abs(centered[AY] - centered[BY]);
+    // if AY and BY values are similar (within threshold), it's a rotation rather than coupled translation
+    // if AY and BY values are substantially different, it's a coupled translation
+    if (diff < DEADZONE) {
+      rotZ = (-centered[AX] + centered[AY]) / RZ_SENSITIVITY;
       transX = 0;
       transY = 0;
-      transZ = 0;
+      rotX = 0;
+      rotY = 0;
     }
-  }
+  } 
 
   // TODO: refactor as a vector
   // Invert directions if needed
