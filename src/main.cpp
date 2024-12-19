@@ -54,8 +54,9 @@ int NUM_AXES = 8;
 // Deadzone to filter out unintended movements. Increase if the mouse has small
 // movements when it should be idle or the mouse is too senstive to subtle
 // movements.
-int DEADZONE = 12;  // Recommended to have this as small as possible for V2 to
-                    // allow smaller knob range of motion.
+// Recommended to have this as small as possible for V2 to
+// allow smaller knob range of motion.
+int DEADZONE = 25;
 
 // sensitivity values for each axis
 int TX_SENSITIVITY = 1;
@@ -80,12 +81,14 @@ void readAllFromJoystick(int* rawReads) {
   int potValues[NUM_AXES] = {0};  // Array to store pot readings multiplexer
 
   // Populate readings
-  for (int j = 0; j < NUM_SAMPLES; j++) {
-    for (int i = 0; i < NUM_AXES; i++) {
-      // set channel
-      digitalWrite(MULTIPLEXER_CONTROL_A, bitRead(i, 0));
-      digitalWrite(MULTIPLEXER_CONTROL_B, bitRead(i, 1));
-      digitalWrite(MULTIPLEXER_CONTROL_C, bitRead(i, 2));
+  for (int i = 0; i < NUM_AXES; i++) {
+    // set channel
+    digitalWrite(MULTIPLEXER_CONTROL_A, bitRead(i, 0));
+    digitalWrite(MULTIPLEXER_CONTROL_B, bitRead(i, 1));
+    digitalWrite(MULTIPLEXER_CONTROL_C, bitRead(i, 2));
+    for (int j = 0; j < NUM_SAMPLES; j++) {
+      // leave time for the multiplexer to stabilise
+      delay(1);
       // take sample from the axis
       potValues[i] += analogRead(MULTIPLEXER_SIG);
     }
@@ -144,12 +147,16 @@ void setup() {
   compositeHID.addDevice(gamepad);
   compositeHID.begin(hostConfig);
 
+  // give a little time to stabilise
+  delay(1000);
   // determine centre points
   readAllFromJoystick(centerPoints);
 }
 
 void loop() {
   int rawReads[NUM_AXES], centered[NUM_AXES];
+  unsigned long startTime = millis();
+  unsigned long remainingTime;
 
   if (compositeHID.isConnected()) {
     // Serial.println("\nn--- Axes Decimal ---");
@@ -189,10 +196,16 @@ void loop() {
 
     // Filter movement values. Set to zero if movement is below deadzone
     // threshold.
-    // TODO: offset values to start from deadzone?
     for (int i = 0; i < NUM_AXES; i++) {
       if (centered[i] < DEADZONE && centered[i] > -DEADZONE) {
         centered[i] = 0;
+      } else {
+        // offset values to start from deadzone
+        if (centered[i] < 0) {
+          centered[i] += DEADZONE;
+        } else {
+          centered[i] -= DEADZONE;
+        }
       }
     }
 
@@ -285,5 +298,10 @@ void loop() {
       Serial.println("BLE not connected");
     }
   }
-  delay(MAIN_LOOP_DELAY);
+
+  remainingTime = MAIN_LOOP_DELAY - (millis() - startTime);
+  if (remainingTime > 0) {
+    // Serial.print("Main loop delay:"); Serial.println(remainingTime);
+    delay(remainingTime);
+  }
 }
