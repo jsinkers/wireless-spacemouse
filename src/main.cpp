@@ -11,6 +11,8 @@
 #include <GamepadDevice.h>
 // #include <BleGamepad.h>
 
+// TODO: probably revert back to BleGamepad.h
+
 // Debugging
 // 0: Debugging off. Set to this once everything is working.
 // 1: Output raw joystick values. 0-4096 raw ADC 12-bit values
@@ -48,21 +50,30 @@ bool invRZ = true;   // Rotate around Z axis (twist left/right)
 //    A           Y-
 //
 
+// Multiplexer setup - using CD4051BE
+// channels
+int A = 1;
+int B = 2;
+int C = 3;
+
+// Analog read pin for joystick sensing
+int X = A0;
+
 // number of potentiometer axes that are read
-int NUM_AXES = 4;
+int NUM_AXES = 8;
 
 // Wiring
-int PINLIST[] = {
-    // The positions of the reads
-    A1,  // X-axis A
-    A0,  // Y-axis A
-    A3,  // X-axis B
-    A2,  // Y-axis B
-         //   A7, // X-axis C
-         //   A6, // Y-axis C
-         //   A9, // X-axis D
-         //   A8  // Y-axis D
-};
+// int PINLIST[] = {
+//     // The positions of the reads
+//     A1,  // X-axis A
+//     A0,  // Y-axis A
+//     A3,  // X-axis B
+//     A2,  // Y-axis B
+//          //   A7, // X-axis C
+//          //   A6, // Y-axis C
+//          //   A9, // X-axis D
+//          //   A8  // Y-axis D
+// };
 
 // Deadzone to filter out unintended movements. Increase if the mouse has small
 // movements when it should be idle or the mouse is too senstive to subtle
@@ -85,8 +96,14 @@ int centerPoints[8];
 // Function to read and store analogue voltages for each joystick axis.
 // TODO: averaging
 void readAllFromJoystick(int* rawReads) {
+  // multiplexer 
   for (int i = 0; i < NUM_AXES; i++) {
-    rawReads[i] = analogRead(PINLIST[i]);
+    // set channel
+    digitalWrite(A, bitRead(i, 0));
+    digitalWrite(B, bitRead(i, 1));
+    digitalWrite(C, bitRead(i, 2));
+    // read value
+    rawReads[i] = analogRead(X);
   }
 }
 
