@@ -101,192 +101,295 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE work!");
   readAllFromJoystick(centerPoints);
+  BleGamepadConfiguration bleGamepadConfiguration;
+
+  // Set the controller type to multi-axis
+  bleGamepadConfiguration.setControllerType(CONTROLLER_TYPE_MULTI_AXIS);
+
+  // Enable automatic reporting
+  bleGamepadConfiguration.setAutoReport(true);
+
+  // Set HID report ID
+  bleGamepadConfiguration.setHidReportId(1); 
+
+  // Set the number of buttons
+  bleGamepadConfiguration.setButtonCount(0); 
+
+  // Set the number of hat switches
+  bleGamepadConfiguration.setHatSwitchCount(0); 
+
+  // Include additional buttons
+  // bleGamepadConfiguration.setIncludeMenu(true);  // Include Menu button
+  // bleGamepadConfiguration.setIncludeHome(true);  // Include Home button
+  // bleGamepadConfiguration.setIncludeBack(true);  // Include Back button
+
+  // Define which special buttons are included
+  // bool specialButtons[] = {true, false, true, false}; // Example: [Menu, Home, Back, Extra]
+  // bleGamepadConfiguration.setWhichSpecialButtons(specialButtons);
+
+  // include x, y, z, rx, ry, rz; no sliders
+  bleGamepadConfiguration.setWhichAxes(true, true, true, true, true, true, false, false);
+
+  // Set the vendor ID (VID) and product ID (PID)
+  bleGamepadConfiguration.setVid(0x256f); // Example VID
+  bleGamepadConfiguration.setPid(0xc631); // Example PID
+
+  // Set the GUID version
+  bleGamepadConfiguration.setGuidVersion(1); // Example version
+
+  // Set axis range
+  bleGamepadConfiguration.setAxesMin(-32768); // Example minimum axis value
+  bleGamepadConfiguration.setAxesMax(32767);  // Example maximum axis value
+
+  // Set simulation control range (optional for simulations)
+  bleGamepadConfiguration.setSimulationMin(-500);   // Example simulation minimum value
+  bleGamepadConfiguration.setSimulationMax(500); // Example simulation maximum value
+
   bleGamepad.begin();
+
+  // This portion sets up the communication with the 3DConnexion software. The
+  // communication protocol is created here. hidReportDescriptor webpage can be
+  // found here:
+  // https://eleccelerator.com/tutorial-about-usb-hid-report-descriptors/
+  // format: report id prefix, value
+  // static const uint8_t _hidReportDescriptor[] PROGMEM = {
+  //   0x05, 0x01,           //  Usage Page (Generic Desktop)
+  //   Done: 0x09, 0x08,           //  0x08: Usage (Multi-Axis)
+
+  //   0xa1, 0x01,           //  Collection (Application)
+
+  //   0xa1, 0x00,           // Collection (Physical)
+  //   Done: 0x85, 0x01,           //  Report ID
+  //   0x16, 0x00, 0x80,     //logical minimum (-500)
+  //   0x26, 0xff, 0x7f,     //logical maximum (500)
+  //   0x36, 0x00, 0x80,     //Physical Minimum (-32768)
+  //   0x46, 0xff, 0x7f,     //Physical Maximum (32767)
+  //   Done: 0x09, 0x30,           //    Usage (X)
+  //   Done: 0x09, 0x31,           //    Usage (Y)
+  //   Done: 0x09, 0x32,           //    Usage (Z)
+  //   0x75, 0x10,           //    Report Size (16)
+  //   0x95, 0x03,           //    Report Count (3)
+  //   0x81, 0x02,           //    Input (variable,absolute)
+  //   0xC0,                 //  End Collection
+
+  //   0xa1, 0x00,           // Collection (Physical)
+  //   0x85, 0x02,           //  Report ID
+  //   Done: 0x16, 0x00, 0x80,     //logical minimum (-500)
+  //   Done: 0x26, 0xff, 0x7f,     //logical maximum (500)
+  //   Done: 0x36, 0x00, 0x80,     //Physical Minimum (-32768)
+  //   Done: 0x46, 0xff, 0x7f,     //Physical Maximum (32767)
+  //   Done: 0x09, 0x33,           //    Usage (RX)
+  //   Done: 0x09, 0x34,           //    Usage (RY)
+  //   Done: 0x09, 0x35,           //    Usage (RZ)
+  //   0x75, 0x10,           //    Report Size (16)
+  //   0x95, 0x03,           //    Report Count (3)
+  //   0x81, 0x02,           //    Input (variable,absolute)
+  //   0xC0,                 //  End Collection
+
+  //   0xa1, 0x00,           // Collection (Physical)
+  //   0x85, 0x03,           //  Report ID
+  //   0x15, 0x00,           //   Logical Minimum (0)
+  //   0x25, 0x01,           //    Logical Maximum (1)
+  //   0x75, 0x01,           //    Report Size (1)
+  //   0x95, 32,             //    Report Count (24)
+  //   0x05, 0x09,           //    Usage Page (Button)
+  //   0x19, 1,              //    Usage Minimum (Button #1)
+  //   0x29, 32,             //    Usage Maximum (Button #24)
+  //   0x81, 0x02,           //    Input (variable,absolute)
+  //   0xC0,
+
+//   0xC0
+// };
+
 }
 
 void loop() {
   int rawReads[NUM_AXES], centered[NUM_AXES];
   // Joystick values are read. 0-1023
-  readAllFromJoystick(rawReads);
-  // Report back 0-1023 raw ADC 10-bit values if enabled
-  // Refactor debug reports
-  if (debug == 1) {
-    Serial.print("Raw - ");
-    Serial.print("AX:");
-    Serial.print(rawReads[0]);
-    Serial.print(",");
-    Serial.print("AY:");
-    Serial.print(rawReads[1]);
-    Serial.print(",");
-    Serial.print("BX:");
-    Serial.print(rawReads[2]);
-    Serial.print(",");
-    Serial.print("BY:");
-    Serial.println(rawReads[3]);
-  }
-
-  // Determine current position relative to idle position
-  for (int i = 0; i < NUM_AXES; i++) {
-    centered[i] = rawReads[i] - centerPoints[i];
-  }
-
-  // Report centered joystick values if enabled. Values should be approx -500 to
-  // +500, jitter around 0 at idle.
-  if (debug == 2) {
-    Serial.print("Centred - ");
-    Serial.print("AX:");
-    Serial.print(centered[0]);
-    Serial.print(",");
-    Serial.print("AY:");
-    Serial.print(centered[1]);
-    Serial.print(",");
-    Serial.print("BX:");
-    Serial.print(centered[2]);
-    Serial.print(",");
-    Serial.print("BY:");
-    Serial.println(centered[3]);
-  }
-
-  // Filter movement values. Set to zero if movement is below deadzone
-  // threshold.
-  for (int i = 0; i < NUM_AXES; i++) {
-    if (centered[i] < DEADZONE && centered[i] > -DEADZONE) {
-      centered[i] = 0;
+  if (bleGamepad.isConnected()) {
+    readAllFromJoystick(rawReads);
+    // Report back 0-1023 raw ADC 10-bit values if enabled
+    // Refactor debug reports
+    if (debug == 1) {
+      Serial.print("Raw - ");
+      Serial.print("AX:");
+      Serial.print(rawReads[0]);
+      Serial.print(",");
+      Serial.print("AY:");
+      Serial.print(rawReads[1]);
+      Serial.print(",");
+      Serial.print("BX:");
+      Serial.print(rawReads[2]);
+      Serial.print(",");
+      Serial.print("BY:");
+      Serial.println(rawReads[3]);
     }
-  }
 
-  // Report centered joystick values. Filtered for deadzone. Approx -500 to
-  // +500, locked to zero at idle
-  if (debug == 3) {
-    Serial.print("Centred/Filtered - ");
-    Serial.print("AX:");
-    Serial.print(centered[0]);
-    Serial.print(",");
-    Serial.print("AY:");
-    Serial.print(centered[1]);
-    Serial.print(",");
-    Serial.print("BX:");
-    Serial.print(centered[2]);
-    Serial.print(",");
-    Serial.print("BY:");
-    Serial.println(centered[3]);
-  }
+    // Determine current position relative to idle position
+    for (int i = 0; i < NUM_AXES; i++) {
+      centered[i] = rawReads[i] - centerPoints[i];
+    }
 
-  // TODO: refactor as a vector
-  // Declare movement variables at 16 bit int16_t to match HID protocol expectation
-  int16_t transX, transY, transZ, rotX, rotY, rotZ;  
+    // Report centered joystick values if enabled. Values should be approx -500 to
+    // +500, jitter around 0 at idle.
+    if (debug == 2) {
+      Serial.print("Centred - ");
+      Serial.print("AX:");
+      Serial.print(centered[0]);
+      Serial.print(",");
+      Serial.print("AY:");
+      Serial.print(centered[1]);
+      Serial.print(",");
+      Serial.print("BX:");
+      Serial.print(centered[2]);
+      Serial.print(",");
+      Serial.print("BY:");
+      Serial.println(centered[3]);
+    }
 
-  // compute translations
-  transX = -centered[AY] / TX_SENSITIVITY;
-  transY = -centered[BY] / TY_SENSITIVITY;
-  if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE)) {
-    transZ = (-centered[AX] - centered[BX]) / TZ_SENSITIVITY;
-    transX = 0;
-    transY = 0;
-  } else {
-    transZ = 0;
-  }
-  
-  // compute rotations
-  rotZ = 0;
-  rotX = (-centered[AX]) / RX_SENSITIVITY;
-  rotY = (+centered[BX]) / RY_SENSITIVITY;
+    // Filter movement values. Set to zero if movement is below deadzone
+    // threshold.
+    for (int i = 0; i < NUM_AXES; i++) {
+      if (centered[i] < DEADZONE && centered[i] > -DEADZONE) {
+        centered[i] = 0;
+      }
+    }
 
-  // check for Z axis rotation - necessary to differentiate from coupled +X-Y translation
-  if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE)) {
-    int diff = abs(centered[AY] - centered[BY]);
-    // if AY and BY values are similar (within threshold), it's a rotation rather than coupled translation
-    // if AY and BY values are substantially different, it's a coupled translation
-    if (diff < DEADZONE) {
-      rotZ = (-centered[AX] + centered[AY]) / RZ_SENSITIVITY;
+    // Report centered joystick values. Filtered for deadzone. Approx -500 to
+    // +500, locked to zero at idle
+    if (debug == 3) {
+      Serial.print("Centred/Filtered - ");
+      Serial.print("AX:");
+      Serial.print(centered[0]);
+      Serial.print(",");
+      Serial.print("AY:");
+      Serial.print(centered[1]);
+      Serial.print(",");
+      Serial.print("BX:");
+      Serial.print(centered[2]);
+      Serial.print(",");
+      Serial.print("BY:");
+      Serial.println(centered[3]);
+    }
+
+    // TODO: refactor as a vector
+    // Declare movement variables at 16 bit int16_t to match HID protocol expectation
+    int16_t transX, transY, transZ, rotX, rotY, rotZ;  
+
+    // compute translations
+    transX = -centered[AY] / TX_SENSITIVITY;
+    transY = -centered[BY] / TY_SENSITIVITY;
+    if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE)) {
+      transZ = (-centered[AX] - centered[BX]) / TZ_SENSITIVITY;
       transX = 0;
       transY = 0;
-      rotX = 0;
-      rotY = 0;
+    } else {
+      transZ = 0;
     }
-  } 
+    
+    // compute rotations
+    rotZ = 0;
+    rotX = (-centered[AX]) / RX_SENSITIVITY;
+    rotY = (+centered[BX]) / RY_SENSITIVITY;
 
-  // TODO: refactor as a vector
-  // Invert directions if needed
-  if (invX == true) {
-    transX = transX * -1;
-  };
-  if (invY == true) {
-    transY = transY * -1;
-  };
-  if (invZ == true) {
-    transZ = transZ * -1;
-  };
-  if (invRX == true) {
-    rotX = rotX * -1;
-  };
-  if (invRY == true) {
-    rotY = rotY * -1;
-  };
-  if (invRZ == true) {
-    rotZ = rotZ * -1;
-  };
+    // check for Z axis rotation - necessary to differentiate from coupled +X-Y translation
+    if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE)) {
+      int diff = abs(centered[AY] - centered[BY]);
+      // if AY and BY values are similar (within threshold), it's a rotation rather than coupled translation
+      // if AY and BY values are substantially different, it's a coupled translation
+      if (diff < DEADZONE) {
+        rotZ = (-centered[AX] + centered[AY]) / RZ_SENSITIVITY;
+        transX = 0;
+        transY = 0;
+        rotX = 0;
+        rotY = 0;
+      }
+    } 
 
-  // Report translation and rotation values if enabled. Approx -800 to 800
-  // depending on the parameter.
-  if (debug == 4) {
-    Serial.print("Transformed - ");
-    Serial.print("TX:");
-    Serial.print(transX);
-    Serial.print(",");
-    Serial.print("TY:");
-    Serial.print(transY);
-    Serial.print(",");
-    Serial.print("TZ:");
-    Serial.print(transZ);
-    Serial.print(",");
-    Serial.print("RX:");
-    Serial.print(rotX);
-    Serial.print(",");
-    Serial.print("RY:");
-    Serial.print(rotY);
-    Serial.print(",");
-    Serial.print("RZ:");
-    Serial.println(rotZ);
+    // TODO: refactor as a vector
+    // Invert directions if needed
+    if (invX == true) {
+      transX = transX * -1;
+    };
+    if (invY == true) {
+      transY = transY * -1;
+    };
+    if (invZ == true) {
+      transZ = transZ * -1;
+    };
+    if (invRX == true) {
+      rotX = rotX * -1;
+    };
+    if (invRY == true) {
+      rotY = rotY * -1;
+    };
+    if (invRZ == true) {
+      rotZ = rotZ * -1;
+    };
+
+    // Report translation and rotation values if enabled. Approx -800 to 800
+    // depending on the parameter.
+    if (debug == 4) {
+      Serial.print("Transformed - ");
+      Serial.print("TX:");
+      Serial.print(transX);
+      Serial.print(",");
+      Serial.print("TY:");
+      Serial.print(transY);
+      Serial.print(",");
+      Serial.print("TZ:");
+      Serial.print(transZ);
+      Serial.print(",");
+      Serial.print("RX:");
+      Serial.print(rotX);
+      Serial.print(",");
+      Serial.print("RY:");
+      Serial.print(rotY);
+      Serial.print(",");
+      Serial.print("RZ:");
+      Serial.println(rotZ);
+    }
+    // Report debug 4 and 5 info side by side for direct reference if enabled.
+    // Very useful if you need to alter which inputs are used in the arithmatic
+    // above.
+    if (debug == 5) {
+      Serial.print("AX:");
+      Serial.print(centered[0]);
+      Serial.print(",");
+      Serial.print("AY:");
+      Serial.print(centered[1]);
+      Serial.print(",");
+      Serial.print("BX:");
+      Serial.print(centered[2]);
+      Serial.print(",");
+      Serial.print("BY:");
+      Serial.print(centered[3]);
+      Serial.print("||");
+      Serial.print("Transformed - ");
+      Serial.print("TX:");
+      Serial.print(transX);
+      Serial.print(",");
+      Serial.print("TY:");
+      Serial.print(transY);
+      Serial.print(",");
+      Serial.print("TZ:");
+      Serial.print(transZ);
+      Serial.print(",");
+      Serial.print("RX:");
+      Serial.print(rotX);
+      Serial.print(",");
+      Serial.print("RY:");
+      Serial.print(rotY);
+      Serial.print(",");
+      Serial.print("RZ:");
+      Serial.println(rotZ);
+    }
+
+    // set data for the BLE gamepad
+    bleGamepad.setAxes(transX, transY, transZ, rotX, rotY, rotZ);
+  } else {
+    Serial.println("BLE not connected");
   }
-  // Report debug 4 and 5 info side by side for direct reference if enabled.
-  // Very useful if you need to alter which inputs are used in the arithmatic
-  // above.
-  if (debug == 5) {
-    Serial.print("AX:");
-    Serial.print(centered[0]);
-    Serial.print(",");
-    Serial.print("AY:");
-    Serial.print(centered[1]);
-    Serial.print(",");
-    Serial.print("BX:");
-    Serial.print(centered[2]);
-    Serial.print(",");
-    Serial.print("BY:");
-    Serial.print(centered[3]);
-    Serial.print("||");
-    Serial.print("Transformed - ");
-    Serial.print("TX:");
-    Serial.print(transX);
-    Serial.print(",");
-    Serial.print("TY:");
-    Serial.print(transY);
-    Serial.print(",");
-    Serial.print("TZ:");
-    Serial.print(transZ);
-    Serial.print(",");
-    Serial.print("RX:");
-    Serial.print(rotX);
-    Serial.print(",");
-    Serial.print("RY:");
-    Serial.print(rotY);
-    Serial.print(",");
-    Serial.print("RZ:");
-    Serial.println(rotZ);
-  }
-
-  // set data for the BLE gamepad
-  bleGamepad.setAxes(transX, transY, transZ, rotX, rotY, rotZ);
   delay(100);
 }
 
