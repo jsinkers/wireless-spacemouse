@@ -58,6 +58,7 @@ int NUM_AXES = 8;
 // allow smaller knob range of motion.
 int DEADZONE = 25;
 
+// todo: use these values to set the sensitivity of the joystick
 // sensitivity values for each axis
 int TX_SENSITIVITY = 1;
 int TY_SENSITIVITY = TX_SENSITIVITY;
@@ -65,6 +66,21 @@ int TZ_SENSITIVITY = 1;
 int RX_SENSITIVITY = 1;
 int RY_SENSITIVITY = RX_SENSITIVITY;
 int RZ_SENSITIVITY = 1;
+
+// TODO - implement smoothing
+float SMOOTHING_FACTOR = 0.9;
+/*
+    float smoothedAX = SMOOTHING_FACTOR * previousAX + (1 - SMOOTHING_FACTOR) * centered[AX];
+    float smoothedBX = SMOOTHING_FACTOR * previousBX + (1 - SMOOTHING_FACTOR) * centered[BX];
+    float smoothedCX = SMOOTHING_FACTOR * previousCX + (1 - SMOOTHING_FACTOR) * centered[CX];
+    float smoothedDX = SMOOTHING_FACTOR * previousDX + (1 - SMOOTHING_FACTOR) * centered[DX];
+
+    // Update previous values
+    previousAX = smoothedAX;
+    previousBX = smoothedBX;
+    previousCX = smoothedCX;
+    previousDX = smoothedDX;
+*/
 
 int NUM_SAMPLES = 3;  // Number of pot samples to take (to smooth the values)
 // int SAMPLE_DELAY = 2;  // Delay in milliseconds between pot samples
@@ -201,11 +217,11 @@ void loop() {
         centered[i] = 0;
       } else {
         // offset values to start from deadzone
-        if (centered[i] < 0) {
-          centered[i] += DEADZONE;
-        } else {
-          centered[i] -= DEADZONE;
-        }
+        // if (centered[i] < 0) {
+        //   centered[i] += DEADZONE;
+        // } else {
+        //   centered[i] -= DEADZONE;
+        // }
       }
     }
 
@@ -233,18 +249,22 @@ void loop() {
       transZ = (-centered[AX] - centered[BX] - centered[CX] - centered[DX]) / 1;
       transX = 0;
       transY = 0;
-    } else {
-      transZ = 0;
-    }
-    rotX = (-centered[AX] + centered[CX]) / 1;
-    rotY = (+centered[BX] - centered[DX]) / 1;
-    if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
-        (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE)) {
-      rotZ = (+centered[AY] + centered[BY] + centered[CY] + centered[DY]) / 2;
       rotX = 0;
       rotY = 0;
-    } else {
       rotZ = 0;
+    } else {
+      transZ = 0;
+      // moved to prevent coupling between RX, RY and TZ
+      rotX = (-centered[AX] + centered[CX]) / 1;
+      rotY = (+centered[BX] - centered[DX]) / 1;
+      if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
+          (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE)) {
+        rotZ = (+centered[AY] + centered[BY] + centered[CY] + centered[DY]) / 2;
+        rotX = 0;
+        rotY = 0;
+      } else {
+        rotZ = 0;
+      }
     }
 
     // TODO: refactor as a vector
