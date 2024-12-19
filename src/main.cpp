@@ -241,31 +241,86 @@ void loop() {
     // Declare movement variables at 16 bit int16_t to match HID protocol
     // expectation
     int16_t transX, transY, transZ, rotX, rotY, rotZ;
-
-    transX = -(-centered[CY] + centered[AY]) / 1;
-    transY = (-centered[BY] + centered[DY]) / 1;
-    if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE) &&
-        (abs(centered[CX]) > DEADZONE) && (abs(centered[DX]) > DEADZONE)) {
-      transZ = (-centered[AX] - centered[BX] - centered[CX] - centered[DX]) / 1;
-      transX = 0;
-      transY = 0;
-      rotX = 0;
-      rotY = 0;
-      rotZ = 0;
+    // For each axis, we want to check the conditions are met for the axis to be active. 
+    // Once met, we compute the translation or rotation value for the axis using a single sensor
+    // due to differences in output values between sensors under similar deflection.
+    
+    // Compute translations
+    // X translation requires CY and AY to be active, and CY to be in opposite directions
+    if ((abs(centered[CY]) > DEADZONE) && (abs(centered[AY]) > DEADZONE) &&
+        (centered[CY] * centered[AY] < 0)) {
+        transX = -centered[CY];  // Use CY as the primary source for translation
     } else {
-      transZ = 0;
-      // moved to prevent coupling between RX, RY and TZ
-      rotX = (-centered[AX] + centered[CX]) / 1;
-      rotY = (+centered[BX] - centered[DX]) / 1;
-      if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
-          (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE)) {
-        rotZ = (+centered[AY] + centered[BY] + centered[CY] + centered[DY]) / 2;
-        rotX = 0;
-        rotY = 0;
-      } else {
-        rotZ = 0;
-      }
+        transX = 0;
     }
+
+    if ((abs(centered[BY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE) &&
+        (centered[BY] * centered[DY] < 0)) {
+        transY = centered[BY];  // Use BY as the primary source for translation
+    } else {
+        transY = 0;
+    }
+
+    // Z translation requires all axes to be active and in the same direction
+    if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE) &&
+        (abs(centered[CX]) > DEADZONE) && (abs(centered[DX]) > DEADZONE) &&
+        (centered[AX] < 0 && centered[BX] < 0 && centered[CX] < 0 && centered[DX] < 0) ||
+        (centered[AX] > 0 && centered[BX] > 0 && centered[CX] > 0 && centered[DX] > 0)) {
+        transZ = -centered[AX];  // Use AX as the primary source for translation
+    } else {
+        transZ = 0;
+    }
+
+    // Compute rotations
+    // RX requires CX and AX to be active, and CX to be rotating in the opposite direction
+    if ((abs(centered[AX]) > DEADZONE) && (abs(centered[CX]) > DEADZONE) &&
+        (centered[AX] * centered[CX] < 0)) {
+        rotX = -centered[AX];  // Use AX as the primary source for rotation
+    } else {
+        rotX = 0;
+    }
+
+    if ((abs(centered[BX]) > DEADZONE) && (abs(centered[DX]) > DEADZONE) &&
+        (centered[BX] * centered[DX] < 0) ) {
+        rotY = centered[BX];  // Use BX as the primary source for rotation
+    } else {
+        rotY = 0;
+    }
+
+    // RZ requires all axes to be active and in the same direction
+    if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
+        (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE) &&
+        ((centered[AY] > 0 && centered[CY] > 0 && centered[BY] > 0 && centered[DY] > 0) ||
+        (centered[AY] < 0 && centered[CY] < 0 && centered[BY] < 0 && centered[DY] < 0))) {
+        rotZ = centered[AY];  // Use AY as the primary source for rotation
+    } else {
+        rotZ = 0;
+    }
+
+    // transX = -(-centered[CY] + centered[AY]) / 1;
+    // transY = (-centered[BY] + centered[DY]) / 1;
+    // if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE) &&
+    //     (abs(centered[CX]) > DEADZONE) && (abs(centered[DX]) > DEADZONE)) {
+    //   transZ = (-centered[AX] - centered[BX] - centered[CX] - centered[DX]) / 1;
+    //   transX = 0;
+    //   transY = 0;
+    //   rotX = 0;
+    //   rotY = 0;
+    //   rotZ = 0;
+    // } else {
+    //   transZ = 0;
+    //   // moved to prevent coupling between RX, RY and TZ
+    //   rotX = (-centered[AX] + centered[CX]) / 1;
+    //   rotY = (+centered[BX] - centered[DX]) / 1;
+    //   if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
+    //       (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE)) {
+    //     rotZ = (+centered[AY] + centered[BY] + centered[CY] + centered[DY]) / 2;
+    //     rotX = 0;
+    //     rotY = 0;
+    //   } else {
+    //     rotZ = 0;
+    //   }
+    // }
 
     // TODO: refactor as a vector
     // Invert directions if needed
