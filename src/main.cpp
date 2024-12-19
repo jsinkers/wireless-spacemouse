@@ -4,7 +4,9 @@
  */
 
 #include <Arduino.h>
-#include <BleGamepad.h>
+//#include <BleGamepad.h>
+#include <BleCompositeHID.h>
+#include <GamepadDevice.h>
 
 // Debugging
 // 0: Debugging off. Set to this once everything is working.
@@ -85,7 +87,19 @@ void readAllFromJoystick(int *rawReads) {
   }
 }
 
-BleGamepad bleGamepad;
+BleCompositeHID compositeHID;
+
+// Gamepad with Report ID 1 (Axes: X, Y, Z)
+GamepadDevice *gamepadTranslation;
+GamepadConfiguration gamepadTranslationConfig;
+
+// Gamepad with Report ID 2 (Axes: RX, RY, RZ)
+GamepadDevice *gamepadRotation;
+GamepadConfiguration gamepadRotationConfig;
+
+// Gamepad with Report ID 3 (Buttons: 24 buttons)
+GamepadDevice *gamepadButtons;
+GamepadConfiguration gamepadButtonsConfig;
 
 // Axes are matched to pin order.
 #define AX 0
@@ -100,52 +114,43 @@ BleGamepad bleGamepad;
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE work!");
-  readAllFromJoystick(centerPoints);
-  BleGamepadConfiguration bleGamepadConfiguration;
+
+  BLEHostConfiguration hostConfig;
+  // Set the vendor ID (VID) and product ID (PID)
+  hostConfig.setVid(0x256f); 
+  hostConfig.setPid(0xc631); 
 
   // Set the controller type to multi-axis
-  bleGamepadConfiguration.setControllerType(CONTROLLER_TYPE_MULTI_AXIS);
+  gamepadTranslationConfig.setControllerType(CONTROLLER_TYPE_MULTI_AXIS);
+  gamepadTranslationConfig.setWhichAxes(true, true, true, false, false, false, false, false); // No buttons in this report
+  gamepadTranslationConfig.setAxesMin(-32768);
+  gamepadTranslationConfig.setAxesMax(32767);
+  gamepadTranslationConfig.setButtonCount(0); // No buttons in this report
 
-  // Enable automatic reporting
-  bleGamepadConfiguration.setAutoReport(true);
+  gamepadRotationConfig.setControllerType(CONTROLLER_TYPE_MULTI_AXIS);
+  gamepadRotationConfig.setWhichAxes(false, false, false, true, true, true, false, false); // No buttons in this report
+  gamepadRotationConfig.setAxesMin(-32768);
+  gamepadRotationConfig.setAxesMax(32767);
+  gamepadRotationConfig.setButtonCount(0); // No buttons in this report
 
-  // Set HID report ID
-  bleGamepadConfiguration.setHidReportId(1); 
+  gamepadButtonsConfig.setControllerType(CONTROLLER_TYPE_MULTI_AXIS);
+  gamepadButtonsConfig.setButtonCount(24); // 24 buttons
+  gamepadButtonsConfig.setWhichAxes(false, false, false, false, false, false, false, false); // No axes in this report
+  gamepadButtonsConfig.setAxesMin(0); // No axes in this report
+  gamepadButtonsConfig.setAxesMax(1);
 
-  // Set the number of buttons
-  bleGamepadConfiguration.setButtonCount(0); 
+  gamepadTranslation = new GamepadDevice(gamepadTranslationConfig);
+  gamepadRotation = new GamepadDevice(gamepadRotationConfig);
+  gamepadButtons = new GamepadDevice(gamepadButtonsConfig);
 
-  // Set the number of hat switches
-  bleGamepadConfiguration.setHatSwitchCount(0); 
+  // 
+  compositeHID.addDevice(gamepadTranslation);
+  compositeHID.addDevice(gamepadRotation);
+  compositeHID.addDevice(gamepadButtons);
 
-  // Include additional buttons
-  // bleGamepadConfiguration.setIncludeMenu(true);  // Include Menu button
-  // bleGamepadConfiguration.setIncludeHome(true);  // Include Home button
-  // bleGamepadConfiguration.setIncludeBack(true);  // Include Back button
+  compositeHID.begin(hostConfig);
 
-  // Define which special buttons are included
-  // bool specialButtons[] = {true, false, true, false}; // Example: [Menu, Home, Back, Extra]
-  // bleGamepadConfiguration.setWhichSpecialButtons(specialButtons);
-
-  // include x, y, z, rx, ry, rz; no sliders
-  bleGamepadConfiguration.setWhichAxes(true, true, true, true, true, true, false, false);
-
-  // Set the vendor ID (VID) and product ID (PID)
-  bleGamepadConfiguration.setVid(0x256f); // Example VID
-  bleGamepadConfiguration.setPid(0xc631); // Example PID
-
-  // Set the GUID version
-  bleGamepadConfiguration.setGuidVersion(1); // Example version
-
-  // Set axis range
-  bleGamepadConfiguration.setAxesMin(-32768); // Example minimum axis value
-  bleGamepadConfiguration.setAxesMax(32767);  // Example maximum axis value
-
-  // Set simulation control range (optional for simulations)
-  bleGamepadConfiguration.setSimulationMin(-500);   // Example simulation minimum value
-  bleGamepadConfiguration.setSimulationMax(500); // Example simulation maximum value
-
-  bleGamepad.begin();
+  readAllFromJoystick(centerPoints);
 
   // This portion sets up the communication with the 3DConnexion software. The
   // communication protocol is created here. hidReportDescriptor webpage can be
@@ -206,7 +211,7 @@ void setup() {
 void loop() {
   int rawReads[NUM_AXES], centered[NUM_AXES];
   // Joystick values are read. 0-1023
-  if (bleGamepad.isConnected()) {
+  if (compositeHID.isConnected()) {
     readAllFromJoystick(rawReads);
     // Report back 0-1023 raw ADC 10-bit values if enabled
     // Refactor debug reports
@@ -386,7 +391,11 @@ void loop() {
     }
 
     // set data for the BLE gamepad
-    bleGamepad.setAxes(transX, transY, transZ, rotX, rotY, rotZ);
+    (*gamepadTranslation).setAxes(transX, transY, transZ);
+    (*gamepadRotation).setRX(rotX);
+    (*gamepadRotation).setRY(rotY);
+    (*gamepadRotation).setRZ(rotZ);
+
   } else {
     Serial.println("BLE not connected");
   }
