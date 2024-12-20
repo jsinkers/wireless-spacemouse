@@ -24,12 +24,12 @@ int debug = 5;
 // Modify the direction of translation/rotation depending on preference. This
 // can also be done per application in the 3DConnexion software. Switch between
 // true/false as desired.
-bool invX = false;   // pan left/right
-bool invY = false;   // pan up/down
+bool invX = true;   // pan left/right
+bool invY = true;   // pan up/down
 bool invZ = true;    // zoom in/out
 bool invRX = true;   // Rotate around X axis (tilt front/back)
 bool invRY = false;  // Rotate around Y axis (tilt left/right)
-bool invRZ = true;   // Rotate around Z axis (twist left/right)
+bool invRZ = false;   // Rotate around Z axis (twist left/right)
 
 // Default Assembly when looking from above:
 //    C           Y+
@@ -238,6 +238,7 @@ void loop() {
     }
 
     // TODO: refactor as a vector
+    // TODO: improve TX/TY coupled motion detection
     // Declare movement variables at 16 bit int16_t to match HID protocol
     // expectation
     int16_t transX, transY, transZ, rotX, rotY, rotZ;
@@ -296,31 +297,6 @@ void loop() {
     } else {
         rotZ = 0;
     }
-
-    // transX = -(-centered[CY] + centered[AY]) / 1;
-    // transY = (-centered[BY] + centered[DY]) / 1;
-    // if ((abs(centered[AX]) > DEADZONE) && (abs(centered[BX]) > DEADZONE) &&
-    //     (abs(centered[CX]) > DEADZONE) && (abs(centered[DX]) > DEADZONE)) {
-    //   transZ = (-centered[AX] - centered[BX] - centered[CX] - centered[DX]) / 1;
-    //   transX = 0;
-    //   transY = 0;
-    //   rotX = 0;
-    //   rotY = 0;
-    //   rotZ = 0;
-    // } else {
-    //   transZ = 0;
-    //   // moved to prevent coupling between RX, RY and TZ
-    //   rotX = (-centered[AX] + centered[CX]) / 1;
-    //   rotY = (+centered[BX] - centered[DX]) / 1;
-    //   if ((abs(centered[AY]) > DEADZONE) && (abs(centered[BY]) > DEADZONE) &&
-    //       (abs(centered[CY]) > DEADZONE) && (abs(centered[DY]) > DEADZONE)) {
-    //     rotZ = (+centered[AY] + centered[BY] + centered[CY] + centered[DY]) / 2;
-    //     rotX = 0;
-    //     rotY = 0;
-    //   } else {
-    //     rotZ = 0;
-    //   }
-    // }
 
     // TODO: refactor as a vector
     // Invert directions if needed
